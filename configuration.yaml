@@ -1,0 +1,36 @@
+workflows:
+  wda-ipa:
+    name: WebDriverAgent device ipa (unsigned)
+    instance_type: mac_mini_m2
+    max_build_duration: 45
+    environment:
+      xcode: latest
+    scripts:
+      - name: Build (device, signing off)
+        script: |
+          cd $CM_BUILD_DIR
+          xcodebuild \
+            -project WebDriverAgent.xcodeproj \
+            -scheme WebDriverAgentRunner \
+            -sdk iphoneos \
+            -configuration Release \
+            -derivedDataPath build \
+            ARCHS=arm64 ONLY_ACTIVE_ARCH=YES \
+            CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO
+ 
+      - name: Ipa csomagolas (dSYM mentesen)
+        script: |
+          cd $CM_BUILD_DIR
+          APP="build/Build/Products/Release-iphoneos/WebDriverAgentRunner-Runner.app"
+          test -d "$APP" || { echo "HIBA: nincs itt az app: $APP"; ls build/Build/Products 2>/dev/null; exit 1; }
+          rm -rf Payload WebDriverAgent-unsigned.ipa
+          mkdir Payload
+          cp -R "$APP" Payload/
+          zip -qr WebDriverAgent-unsigned.ipa Payload
+          # A dSYM debug-fajlok tonkreteszik a Sideloadlyt ("macho sign/edit failed")
+          zip -d WebDriverAgent-unsigned.ipa "*dSYM*" || true
+          echo "--- az ipa tartalma:"
+          unzip -l WebDriverAgent-unsigned.ipa
+ 
+    artifacts:
+      - WebDriverAgent-unsigned.ipa
